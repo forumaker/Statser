@@ -13,7 +13,7 @@ Adds a live online widget — see who's browsing and what page they're on. **Sup
 
 
 ## 📸 Screenshots
-
+<img width="1060" height="190" alt="image" src="https://github.com/user-attachments/assets/320e3e50-c4b3-4521-86b1-9688677f9899" />
 
 
 ## 📦 Installation
