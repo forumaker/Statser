@@ -10,7 +10,6 @@ use Flarum\Post\Event\Deleted as PostDeleted;
 use Flarum\Post\Event\Posted;
 use Flarum\User\Event\Deleted as UserDeleted;
 use Flarum\User\Event\Registered;
-use Flarum\User\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Events\Dispatcher;
 
@@ -25,8 +24,6 @@ class FlushCaches
     {
         $events->listen(Registered::class, [$this, 'flushAll']);
         $events->listen(UserDeleted::class, [$this, 'flushAll']);
-        $events->listen('eloquent.deleted: ' . User::class, [$this, 'flushAll']);
-        $events->listen('eloquent.created: ' . User::class, [$this, 'flushAll']);
         $events->listen(DiscussionStarted::class, [$this, 'flushStats']);
         $events->listen(DiscussionDeleted::class, [$this, 'flushStats']);
         $events->listen(Posted::class, [$this, 'flushStats']);

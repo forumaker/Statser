@@ -190,8 +190,8 @@ class ForumResourceFields
             $visibleQuery = clone $allOnlineQuery;
             $visibleQuery->where(function ($q) {
                 $q->whereNull('preferences')
-                    ->orWhereRaw("JSON_EXTRACT(preferences, '$.discloseOnline') IS NULL")
-                    ->orWhereRaw("JSON_EXTRACT(preferences, '$.discloseOnline') != false");
+                    ->orWhereNull('preferences->discloseOnline')
+                    ->orWhere('preferences->discloseOnline', '!=', false);
             });
 
             $totalVisible = (clone $visibleQuery)->count();
@@ -222,15 +222,9 @@ class ForumResourceFields
             return [];
         }
 
-        $ids = array_column($data['users'], 'id');
-        $existing = array_flip(User::query()->whereIn('id', $ids)->pluck('id')->all());
         $models = [];
 
         foreach ($data['users'] as $attributes) {
-            if (! isset($existing[$attributes['id']])) {
-                continue;
-            }
-
             $user = new User();
             $user->setRawAttributes($attributes, true);
             $user->exists = true;
@@ -317,10 +311,6 @@ class ForumResourceFields
         $attributes = $stats['latest_user'] ?? null;
 
         if (! $attributes) {
-            return null;
-        }
-
-        if (! User::query()->whereKey($attributes['id'])->exists()) {
             return null;
         }
 

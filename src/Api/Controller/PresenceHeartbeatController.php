@@ -141,7 +141,7 @@ class PresenceHeartbeatController implements RequestHandlerInterface
     protected function isBotUserAgent(string $ua): bool
     {
         if ($ua === '') {
-            return false;
+            return true;
         }
 
         $lower = strtolower($ua);
@@ -172,19 +172,6 @@ class PresenceHeartbeatController implements RequestHandlerInterface
 
     protected function resolveClientIp(ServerRequestInterface $request): string
     {
-        $cf = $request->getHeaderLine('CF-Connecting-IP');
-        if ($cf !== '') {
-            return trim($cf);
-        }
-
-        $xff = $request->getHeaderLine('X-Forwarded-For');
-        if ($xff !== '') {
-            $first = trim(explode(',', $xff)[0]);
-            if ($first !== '') {
-                return $first;
-            }
-        }
-
         $server = $request->getServerParams();
 
         return $server['REMOTE_ADDR'] ?? '';
