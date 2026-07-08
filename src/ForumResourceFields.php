@@ -264,6 +264,7 @@ class ForumResourceFields
                 'route' => $entry['route'] ?? null,
                 'label' => $entry['label'] ?? null,
                 'standalone' => (bool) ($entry['standalone'] ?? false),
+                'private' => (bool) ($entry['private'] ?? false),
             ];
         }
 

@@ -9,7 +9,7 @@ import extractText from 'flarum/common/utils/extractText';
 
 const PRE = 'forumaker-statser.forum.widget.';
 
-type ActivityEntry = { route?: string | null; label?: string | null; standalone?: boolean | null };
+type ActivityEntry = { route?: string | null; label?: string | null; standalone?: boolean | null; private?: boolean | null };
 
 function parseActivityMap(raw: unknown): Record<string, ActivityEntry> {
   if (typeof raw !== 'string' || !raw) return {};
@@ -74,11 +74,19 @@ export default class StatserWidget extends Component<StatserAttrs> {
       const tooltipParts: string[] = [extractText(username(user))];
 
       if (showCurrentPage) {
+        // `private` is a server-verified flag (see PresenceHeartbeatController) —
+        // when set, we always render our own translated placeholder and ignore
+        // whatever `label` the client happened to send, even if it looks safe.
+        const page = entry?.private
+          ? extractText(app.translator.trans('forumaker-statser.forum.routes.private_discussion'))
+          : entry?.label ?? null;
+        const isStandalone = !entry?.private && !!entry?.standalone;
+
         tooltipParts.push(
-          entry?.label
-            ? entry.standalone
-              ? entry.label
-              : extractText(app.translator.trans(PRE + 'viewing_page', { page: entry.label }))
+          page != null
+            ? isStandalone
+              ? page
+              : extractText(app.translator.trans(PRE + 'viewing_page', { page }))
             : extractText(app.translator.trans(PRE + 'viewing_unknown'))
         );
       }

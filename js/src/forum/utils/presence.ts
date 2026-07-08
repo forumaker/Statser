@@ -59,6 +59,13 @@ export interface DescribedRoute {
    * "Viewing {page}" template.
    */
   standalone?: boolean;
+  /**
+   * Present when the current route is a specific discussion. The server uses
+   * this to independently verify privacy (see PresenceHeartbeatController) —
+   * we never rely solely on the client's own isPrivateDiscussion() check for
+   * something this sensitive.
+   */
+  discussionId?: string;
 }
 
 export function describeCurrentRoute(): DescribedRoute | null {
@@ -89,22 +96,32 @@ export function describeCurrentRoute(): DescribedRoute | null {
 
       case 'discussion': {
         const discussion = current.get('discussion');
+        const discussionId: string | undefined =
+          discussion?.id?.() != null ? String(discussion.id()) : undefined;
 
         if (isPrivateDiscussion(discussion)) {
-          return { route: routeName, label: extractText(app.translator.trans(pre + 'private_discussion')) };
+          return {
+            route: routeName,
+            label: extractText(app.translator.trans(pre + 'private_discussion')),
+            discussionId,
+          };
         }
 
-        const rawTitle =
-          discussion?.title?.() ??
-          discussion?.attribute?.('title') ??
-          (discussion as any)?.data?.attributes?.title ??
-          (document.title?.replace(/\s*[|·—–]\s*.+$/, '').trim() || null);
+        // No `document.title` fallback here on purpose: that string can't be
+        // verified for privacy, and DiscussionPage sets the tab title before
+        // `app.current.set('discussion', ...)` runs — so during that window
+        // it could reveal a private conversation's real title even though
+        // `discussion` itself isn't populated yet to check. When we don't
+        // have the model, we simply don't report a title; the server also
+        // independently re-checks privacy by ID as a second line of defense.
+        const rawTitle = discussion?.title?.() ?? discussion?.attribute?.('title') ?? (discussion as any)?.data?.attributes?.title ?? null;
         const title = rawTitle ? rawTitle.replace(/\s+[-–]\s+\S+$/, '').trim() || rawTitle : null;
         return {
           route: routeName,
           label: title
             ? extractText(app.translator.trans(pre + 'discussion', { title: truncate(title) }))
             : extractText(app.translator.trans(pre + 'generic')),
+          discussionId,
         };
       }
 
@@ -200,6 +217,7 @@ function fireHeartbeat(): void {
         body.route = described.route;
         body.label = described.label;
         if (described.standalone) body.standalone = '1';
+        if (described.discussionId) body.discussionId = described.discussionId;
       }
     }
 

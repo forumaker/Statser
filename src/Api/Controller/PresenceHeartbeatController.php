@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace forumaker\Statser\Api\Controller;
 
+use Flarum\Discussion\Discussion;
 use Flarum\Http\RequestUtil;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Cache\Repository as Cache;
@@ -96,6 +97,25 @@ class PresenceHeartbeatController implements RequestHandlerInterface
             return;
         }
 
+        // Never trust the client's own judgement about whether a discussion is
+        // private — that check runs in JS and can miss (page-load race before
+        // the discussion model is set, a future frontend regression, a
+        // different privacy extension we don't know about). If we can
+        // independently confirm the reported discussion is private, we
+        // discard whatever label the client sent, no matter what it says.
+        $private = false;
+        if ($route === 'discussion') {
+            $discussionId = $this->sanitizeDiscussionId($body['discussionId'] ?? null);
+            if ($discussionId !== null) {
+                $private = $this->isDiscussionPrivate($discussionId);
+            }
+        }
+
+        if ($private) {
+            $label = null;
+            $standalone = false;
+        }
+
         $intervalMin = max(1, (int) $this->settings->get('forumaker-statser.last_seen_interval', 5));
         $now = time();
         $cutoff = $now - $intervalMin * 60;
@@ -116,10 +136,66 @@ class PresenceHeartbeatController implements RequestHandlerInterface
             'route' => $route,
             'label' => $label,
             'standalone' => $standalone,
+            'private' => $private,
             'ts' => $now,
         ];
 
         $this->cache->put(self::ACTIVITY_CACHE_KEY, $map, $intervalMin * 60 + 60);
+    }
+
+    protected function sanitizeDiscussionId(mixed $value): ?int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '' && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * Independently determines whether a discussion is a FoF Byōbu private
+     * conversation, without trusting anything the client reported. Cached
+     * briefly since a busy discussion can generate several heartbeats a
+     * minute across its participants' open tabs.
+     *
+     * Fails closed: if Byōbu isn't installed there's nothing to hide, but any
+     * unexpected error while checking (e.g. an incompatible future Byōbu
+     * release) is treated as private — for a privacy check, wrongly hiding a
+     * public discussion's title is a much smaller problem than wrongly
+     * showing a private one's.
+     */
+    protected function isDiscussionPrivate(int $discussionId): bool
+    {
+        if (! class_exists(\FoF\Byobu\Discussion\Screener::class)) {
+            return false;
+        }
+
+        return (bool) $this->cache->remember(
+            'forumaker-statser.discussion-private.' . $discussionId,
+            30,
+            function () use ($discussionId) {
+                try {
+                    $discussion = Discussion::find($discussionId);
+                    if (! $discussion) {
+                        // Deleted/nonexistent — nothing to leak, and treating
+                        // it as private would just show a slightly-wrong
+                        // generic label for a heartbeat that's about to
+                        // expire anyway.
+                        return false;
+                    }
+
+                    $screener = new \FoF\Byobu\Discussion\Screener();
+
+                    return $screener->fromDiscussion($discussion)->isPrivate();
+                } catch (\Throwable $e) {
+                    return true;
+                }
+            }
+        );
     }
 
     protected function handleGuest(ServerRequestInterface $request): void
