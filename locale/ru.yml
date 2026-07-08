@@ -15,10 +15,11 @@ forumaker-statser:
       empty_online: "Сейчас никого нет"
       viewing_unknown: "Просматривает форум"
       viewing_page: "Смотрит {page}"
+      title: "Статистика онлайна"
     routes:
       index: "все темы"
       discussion: "тему «{title}»"
-      tag: "раздел «{name}»"
+      tag: "тег «{name}»"
       user: "профиль {name}"
       tags: "главную"
       settings: "настройки"
@@ -26,6 +27,8 @@ forumaker-statser:
       flags: "жалобы"
       search: "поиск"
       generic: "страницу форума"
+      private_discussion: "переписку"
+      arena: "Сражается на Арене"
     aria:
       expand: "Показать пользователей в сети"
       collapse: "Скрыть пользователей в сети"

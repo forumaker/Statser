@@ -263,6 +263,7 @@ class ForumResourceFields
             $map[(string) $userId] = [
                 'route' => $entry['route'] ?? null,
                 'label' => $entry['label'] ?? null,
+                'standalone' => (bool) ($entry['standalone'] ?? false),
             ];
         }
 

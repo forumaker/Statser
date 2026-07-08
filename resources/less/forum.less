@@ -113,14 +113,19 @@
   background: var(--control-bg);
 }
 
+// Hidden users: cool slate-blue. Guests: warm amber. Same dashed border
+// style for both — color alone carries the distinction, so it reads at a
+// glance instead of relying on a dashed/dotted squint test.
 .StatserWidget-badge--hidden {
-  border: 1.5px dashed var(--muted-color);
-  background: transparent;
+  border: 1.5px dashed #7c8aa5;
+  background: color-mix(in srgb, #7c8aa5 14%, transparent);
+  color: #7c8aa5;
 }
 
 .StatserWidget-badge--guest {
-  border: 2px dotted var(--muted-color);
-  background: transparent;
+  border: 1.5px dashed #c98a2e;
+  background: color-mix(in srgb, #c98a2e 14%, transparent);
+  color: #c98a2e;
 }
 
 .StatserWidget-empty {

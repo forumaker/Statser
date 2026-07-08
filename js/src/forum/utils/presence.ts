@@ -34,7 +34,34 @@ export function refreshForumData(): Promise<void> {
   return inflightRefresh;
 }
 
-export function describeCurrentRoute(): { route: string; label: string } | null {
+/**
+ * True if the current discussion belongs to FoF Byōbu (private conversation).
+ * `isPrivateDiscussion` is added to the Discussion model by that extension;
+ * it is simply absent when Byōbu isn't installed, so this stays a no-op then.
+ */
+function isPrivateDiscussion(discussion: any): boolean {
+  try {
+    return !!discussion?.isPrivateDiscussion?.();
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Route names Byōbu registers on the frontend for private-conversation pages. */
+const BYOBU_ROUTES = new Set(['byobuPrivate', 'byobuUserPrivate', 'byobuComposer']);
+
+export interface DescribedRoute {
+  route: string;
+  label: string;
+  /**
+   * When true, `label` is already a complete sentence (e.g. "Fighting in the
+   * Arena") and must be displayed as-is instead of being substituted into the
+   * "Viewing {page}" template.
+   */
+  standalone?: boolean;
+}
+
+export function describeCurrentRoute(): DescribedRoute | null {
   try {
     const current = app.current;
     if (!current || typeof current.get !== 'function') return null;
@@ -43,6 +70,17 @@ export function describeCurrentRoute(): { route: string; label: string } | null 
     if (!routeName) return null;
 
     const pre = 'forumaker-statser.forum.routes.';
+
+    // FoF Arena compatibility: battle URLs aren't exposed as a distinct Mithril
+    // route, so we match on the URL itself per Arena's "bitva" path segment.
+    if (typeof window !== 'undefined' && window.location?.pathname?.includes('bitva')) {
+      return { route: routeName, label: extractText(app.translator.trans(pre + 'arena')), standalone: true };
+    }
+
+    if (BYOBU_ROUTES.has(routeName)) {
+      return { route: routeName, label: extractText(app.translator.trans(pre + 'private_discussion')) };
+    }
+
     const base = routeName.split('.')[0];
 
     switch (base) {
@@ -51,6 +89,11 @@ export function describeCurrentRoute(): { route: string; label: string } | null 
 
       case 'discussion': {
         const discussion = current.get('discussion');
+
+        if (isPrivateDiscussion(discussion)) {
+          return { route: routeName, label: extractText(app.translator.trans(pre + 'private_discussion')) };
+        }
+
         const rawTitle =
           discussion?.title?.() ??
           discussion?.attribute?.('title') ??
@@ -66,7 +109,13 @@ export function describeCurrentRoute(): { route: string; label: string } | null 
       }
 
       case 'tag': {
-        const tag = current.get('tag');
+        // flarum/tags never calls `app.current.set('tag', ...)` — it only
+        // exposes the current tag via an instance method on the IndexPage
+        // component (`currentTag()`), which isn't reachable from here. The
+        // slug is available from the route itself (`/t/:tags`), so we look
+        // the model up in the store the same way flarum/tags does internally.
+        const slug: string | undefined = m.route.param('tags');
+        const tag: any = slug ? app.store.getBy('tags', 'slug' as any, slug) : undefined;
         const name = tag?.name?.();
         return {
           route: routeName,
@@ -150,6 +199,7 @@ function fireHeartbeat(): void {
       if (described) {
         body.route = described.route;
         body.label = described.label;
+        if (described.standalone) body.standalone = '1';
       }
     }
 
@@ -197,23 +247,9 @@ export function startPresence(): void {
     setTimeout(fireHeartbeat, 0);
   }
 
-  bindRealtimeRefresh();
-}
-
-function bindRealtimeRefresh(): void {
-  try {
-    const echo = (app as any).pusher;
-    if (!echo || typeof echo.channel !== 'function') return;
-
-    const channel = echo.channel('public');
-    if (!channel || typeof channel.listenToAll !== 'function') return;
-
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-
-    channel.listenToAll(() => {
-      if (app.current?.get?.('routeName') !== 'index') return;
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => refreshForumData(), 800);
-    });
-  } catch (e) {}
+  // No Pusher/WebSocket dependency: refresh triggers are SPA return-to-index
+  // (see forum/index.tsx), tab refocus (above), and the heartbeat tick itself.
+  // That's the same "live enough" combination flarum-ext-forum-stats-widget
+  // uses, and it doesn't depend on flarum/pusher being installed and
+  // configured, which almost no forum has.
 }

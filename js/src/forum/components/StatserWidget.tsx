@@ -7,11 +7,9 @@ import username from 'flarum/common/helpers/username';
 import formatNumber from 'flarum/common/utils/formatNumber';
 import extractText from 'flarum/common/utils/extractText';
 
-import { describeCurrentRoute } from '../utils/presence';
-
 const PRE = 'forumaker-statser.forum.widget.';
 
-type ActivityEntry = { route?: string | null; label?: string | null };
+type ActivityEntry = { route?: string | null; label?: string | null; standalone?: boolean | null };
 
 function parseActivityMap(raw: unknown): Record<string, ActivityEntry> {
   if (typeof raw !== 'string' || !raw) return {};
@@ -78,7 +76,9 @@ export default class StatserWidget extends Component<StatserAttrs> {
       if (showCurrentPage) {
         tooltipParts.push(
           entry?.label
-            ? extractText(app.translator.trans(PRE + 'viewing_page', { page: entry.label }))
+            ? entry.standalone
+              ? entry.label
+              : extractText(app.translator.trans(PRE + 'viewing_page', { page: entry.label }))
             : extractText(app.translator.trans(PRE + 'viewing_unknown'))
         );
       }
@@ -193,5 +193,3 @@ export default class StatserWidget extends Component<StatserAttrs> {
     );
   }
 }
-
-export { describeCurrentRoute };
